@@ -1,8 +1,10 @@
 #include <cstring>
-#include <cstdint>
 #include <cstdlib>
 #include <iostream>
+#include <exception>
 #include <fstream>
+
+#define ROM_BANK_SIZE 0x4000
 
 #include "cartridge.hpp"
 
@@ -12,11 +14,10 @@ char nesSign[4] = {'N', 'E', 'S', 0x1A};
 
 Cartridge::Cartridge(string fn){
 	fname = fn;
-	cout << "Parsing cartridge..." << endl;
 	bool status = parse(fn);
-	if(!status){
+	if(!status) {
 		// TODO: Throw exception?
-		cerr << "Unable to parse rom file: " << fn << endl;
+		throw invalid_argument("unable to parse cartridge data.");
 	}
 
 	string mirroring;
@@ -34,8 +35,8 @@ Cartridge::Cartridge(string fn){
 	    "PRG-ROM: " << prgROMsize << " banks of 16KB" << endl <<
 	    "CHR-ROM: " << chrROMsize << " banks of 16KB" << endl <<
 	    "Mirroring: " << mirroring << endl <<
-	    "Battery backed RAM: " << (batteryRAM ? "Yes" : "No") << endl <<
-	    "512 byte trainer: " << (trainer ? "Yes" : "No") << endl <<
+	    "Battery backed RAM: " << (includesBatteryRAM ? "Yes" : "No") << endl <<
+	    "512 byte trainer: " << (includesTrainer ? "Yes" : "No") << endl <<
 	    "Mapper: " << mapper << endl;
 }
 
@@ -66,20 +67,32 @@ bool Cartridge::parse(string fname){
 		mirroringType = ((header[6] & 1) == 1 ? VERTICAL : HORIZONTAL);
 	}
 	// Battery backed RAM
-	batteryRAM = (header[6] & 2) == 2;
+	includesBatteryRAM = (header[6] & 2) == 2;
 	// 512 byte trainer
-	trainer = (header[6] & 4) == 4;
+	includesTrainer = (header[6] & 4) == 4;
 	// Mapper number
 	mapper = (header[7] & 0xF0) | (header[6] >> 4);
 
 	// Amount of 8KB RAM Banks, for backwards compatibility
 	RAMBanks = header[8];
-	if(!RAMBanks){
+	if(!RAMBanks) {
 		// 1 bank should always be assumed, even though
 		// the value is 0.
 		RAMBanks = 1;
 	}
 
+	if(includesTrainer) {
+		trainer = new char[512];
+		gameFile.read(trainer, 512);
+	}
+
+	cout << "\tPOS: " << gameFile.tellg() << endl;
+	prgROM = new char[ROM_BANK_SIZE * prgROMsize];
+	gameFile.read(prgROM, ROM_BANK_SIZE * prgROMsize);
+	cout << "\tPOS: " << gameFile.tellg() << endl;
+	chrROM = new char[ROM_BANK_SIZE * chrROMsize];
+	gameFile.read(chrROM, ROM_BANK_SIZE * chrROMsize);
+	cout << "\tPOS: " << gameFile.tellg() << endl;
 	return true;
 }
 
@@ -96,11 +109,11 @@ MIRRORING Cartridge::getMirroringType(){
 }
 
 bool Cartridge::hasBatteryRAM(){
-	return batteryRAM;
+	return includesBatteryRAM;
 }
 
 bool Cartridge::has512Trainer(){
-	return trainer;
+	return includesTrainer;
 }
 
 unsigned short int Cartridge::getMapperNumber(){
