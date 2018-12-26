@@ -4,40 +4,23 @@
 #include <exception>
 #include <fstream>
 
-#define ROM_BANK_SIZE 0x4000
+#define PRG_ROM_BANK_SIZE 0x4000
+#define CHR_ROM_BANK_SIZE 0x2000
 
 #include "cartridge.hpp"
+#include "mapper.hpp"
 
 using namespace std;
 
 char nesSign[4] = {'N', 'E', 'S', 0x1A};
 
-Cartridge::Cartridge(string fn){
+Cartridge::Cartridge(string fn) {
 	fname = fn;
 	bool status = parse(fn);
 	if(!status) {
 		// TODO: Throw exception?
 		throw invalid_argument("unable to parse cartridge data.");
 	}
-
-	string mirroring;
-	switch (mirroringType) {
-		case VERTICAL:
-			mirroring = "Vertical";
-			break;
-		case HORIZONTAL:
-			mirroring = "Horizontal";
-			break;
-		case FOUR_SCREEN:
-			mirroring = "Four Screen";
-	}
-	cout << "Rom: '" << fname << "'" << endl <<
-	    "PRG-ROM: " << prgROMsize << " banks of 16KB" << endl <<
-	    "CHR-ROM: " << chrROMsize << " banks of 16KB" << endl <<
-	    "Mirroring: " << mirroring << endl <<
-	    "Battery backed RAM: " << (includesBatteryRAM ? "Yes" : "No") << endl <<
-	    "512 byte trainer: " << (includesTrainer ? "Yes" : "No") << endl <<
-	    "Mapper: " << mapper << endl;
 }
 
 bool Cartridge::parse(string fname){
@@ -57,8 +40,8 @@ bool Cartridge::parse(string fname){
 	}
 
 	// ROM Sizes (amount of 16KB Banks)
-	prgROMsize = (unsigned short int) header[4];
-	chrROMsize = (unsigned short int) header[5];
+	size_t prgROMsize = (size_t) header[4];
+	size_t chrROMsize = (size_t) header[5];
 
 	// Screen mirroring type (bit 3 overrides bit 1)
 	if((header[6] & 8) == 8) {
@@ -71,7 +54,10 @@ bool Cartridge::parse(string fname){
 	// 512 byte trainer
 	includesTrainer = (header[6] & 4) == 4;
 	// Mapper number
-	mapper = (header[7] & 0xF0) | (header[6] >> 4);
+	mapperNumber = (header[7] & 0xF0) | (header[6] >> 4);
+	if(mapperNumber != 0) {
+		throw invalid_argument("mapper not yet implemented.");
+	}
 
 	// Amount of 8KB RAM Banks, for backwards compatibility
 	RAMBanks = header[8];
@@ -86,22 +72,25 @@ bool Cartridge::parse(string fname){
 		gameFile.read(trainer, 512);
 	}
 
-	cout << "\tPOS: " << gameFile.tellg() << endl;
-	prgROM = new char[ROM_BANK_SIZE * prgROMsize];
-	gameFile.read(prgROM, ROM_BANK_SIZE * prgROMsize);
-	cout << "\tPOS: " << gameFile.tellg() << endl;
-	chrROM = new char[ROM_BANK_SIZE * chrROMsize];
-	gameFile.read(chrROM, ROM_BANK_SIZE * chrROMsize);
-	cout << "\tPOS: " << gameFile.tellg() << endl;
+	char *prgROM = new char[PRG_ROM_BANK_SIZE * prgROMBanks];
+	gameFile.read(prgROM, PRG_ROM_BANK_SIZE * prgROMBanks);
+	char *chrROM = new char[CHR_ROM_BANK_SIZE * chrROMBanks];
+	gameFile.read(chrROM, CHR_ROM_BANK_SIZE * chrROMBanks);
+
+	mapper = new NROM(prgROM, chrROM, prgROMBanks, chrROMBanks);
 	return true;
 }
 
-unsigned short int Cartridge::getPrgROMSize(){
-	return prgROMsize;
+Cartridge::~Cartridge(){
+	delete mapper;
 }
 
-unsigned short int Cartridge::getChrROMSize(){
-	return chrROMsize;
+size_t Cartridge::getPrgROMSize(){
+	return prgROMBanks;
+}
+
+size_t Cartridge::getChrROMSize(){
+	return chrROMBanks;
 }
 
 MIRRORING Cartridge::getMirroringType(){
@@ -117,11 +106,41 @@ bool Cartridge::has512Trainer(){
 }
 
 unsigned short int Cartridge::getMapperNumber(){
-	return mapper;
+	return mapperNumber;
+}
+
+ostream &operator<<(ostream &out, const Cartridge &cart){
+	string mirroring;
+	switch (cart.mirroringType) {
+		case VERTICAL:
+			mirroring = "Vertical";
+			break;
+		case HORIZONTAL:
+			mirroring = "Horizontal";
+			break;
+		case FOUR_SCREEN:
+			mirroring = "Four Screen";
+	}
+
+	out << "Rom: '" << cart.fname << "'" << endl <<
+	    "PRG-ROM: " << cart.prgROMBanks << " banks of 16KB" << endl <<
+	    "CHR-ROM: " << cart.chrROMBanks << " banks of 16KB" << endl <<
+	    "Mirroring: " << mirroring << endl <<
+	    "Battery backed RAM: " << (cart.includesBatteryRAM ? "Yes" : "No") << endl <<
+	    "512 byte trainer: " << (cart.includesTrainer ? "Yes" : "No") << endl <<
+	    "Mapper: " << cart.mapperNumber << endl;
+	return out;
 }
 
 int main(int argc, char const *argv[]) {
-	Cartridge cart("Mega Man 6 (U).nes");
+	if(argc  < 2) {
+		cerr << "Usage:\n\tcart [ROM]" << endl;
+		exit(1);
+	}
+
+	string fname(argv[1]);
+	Cartridge cart(fname);
+	cout << cart;
 
 	return 0;
 }
