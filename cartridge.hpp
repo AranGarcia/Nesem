@@ -21,17 +21,19 @@ public:
 	unsigned short int getMapperNumber();
 private:
 	bool parse(std::string);
-	NROM *mapper;
+	Mapper *mapper;
 
 	std::string fname;
+
 	// ROM sizes in KB
 	size_t prgROMBanks;
 	size_t chrROMBanks;
+	size_t prgRAMBanks;
+
 	MIRRORING mirroringType;
 	bool includesBatteryRAM;
 	bool includesTrainer;
 	unsigned short int mapperNumber;
-	size_t RAMBanks;
 
 	char *trainer;
 };

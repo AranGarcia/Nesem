@@ -1,16 +1,30 @@
 #include <cstdlib>
+#include <exception>
+#include <iostream>
 #include "mapper.hpp"
 
 using namespace std;
 
-NROM::NROM(char *pr, char *cr, const size_t prb, const size_t crb){
-    prgROM = pr;
-    chrROM = cr;
-    prgROMBanks = prb;
-    chrROMBanks = crb;
+Mapper::Mapper(uint8_t *prom, uint8_t *crom, uint8_t *pram, const size_t pro, const size_t crb, const size_t pra){
+	prgROM = prom;
+	chrROM = crom;
+	prgRAM = pram;
+
+	prgROMBanks = pro;
+	chrROMBanks = crb;
+	prgRAMBanks = pra;
 }
 
-NROM::~NROM(){
-    delete prgROM;
-    delete chrROM;
+Mapper::~Mapper(){
+	delete prgROM;
+	delete chrROM;
+	delete prgRAM;
+}
+
+uint8_t Mapper::read(uint16_t addr) const {
+	/*
+	 * Does no bank switching
+	 */
+	addr -= 0x8000;
+	return prgROM[addr];
 }
