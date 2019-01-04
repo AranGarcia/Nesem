@@ -1,9 +1,9 @@
 #include <cstdint>
-#include <cstring>
 #include <cstdlib>
-#include <iostream>
+#include <cstring>
 #include <exception>
 #include <fstream>
+#include <iostream>
 
 #define PRG_ROM_BANK_SIZE 0x4000
 #define CHR_ROM_BANK_SIZE 0x2000
@@ -97,6 +97,13 @@ Cartridge::~Cartridge(){
     delete mapper;
 }
 
+/*
+   Reads indirectly from the cartridge through the mapper
+ */
+uint8_t Cartridge::read(uint16_t addr){
+    return mapper->read(addr);
+}
+
 size_t Cartridge::getPrgROMSize(){
     return prgROMBanks;
 }
@@ -123,6 +130,8 @@ unsigned short int Cartridge::getMapperNumber(){
 
 ostream &operator<<(ostream &out, const Cartridge &cart){
     string mirroring;
+
+
     switch (cart.mirroringType) {
         case VERTICAL:
             mirroring = "Vertical";
