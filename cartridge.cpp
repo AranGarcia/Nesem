@@ -28,6 +28,8 @@ bool Cartridge::parse(string fname){
     ifstream gameFile(fname, ifstream::in | ifstream::binary);
 
     if(!gameFile) {
+		cerr << "Unable to open input stream for cartridge data." 
+			<< endl;
         return false;
     }
 
@@ -36,7 +38,8 @@ bool Cartridge::parse(string fname){
     // Identify file with 0x4E 0x45 0x53 0x1A (NES\x1A) signature
     gameFile.read(header, 16);
     char *pos = strstr(header, nesSign);
-    if(pos == nullptr || pos != header) {
+    if(pos == nullptr || (strcmp(pos, header) != 0)) {
+		cerr << "Unrecognized header" << endl;
         return false;
     }
 
