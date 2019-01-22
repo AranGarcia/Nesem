@@ -1,2 +1,8 @@
 # Object files
 *.o
+
+# IDE and Editor files
+.idea/
+
+# Build
+cmake-build-debug/
