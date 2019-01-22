@@ -1,5 +1,4 @@
 #include <cstdint>
-#include <cstdlib>
 #include <cstring>
 #include <exception>
 #include <fstream>
@@ -10,7 +9,6 @@
 #define PRG_RAM_BANK_SIZE 0X2000
 
 #include "cartridge.hpp"
-#include "mapper.hpp"
 
 using namespace std;
 
@@ -37,8 +35,7 @@ bool Cartridge::parse(string fname) {
 
     // Identify file with 0x4E 0x45 0x53 0x1A (NES\x1A) signature
     gameFile.read(header, 16);
-    char *pos = strstr(header, nesSign);
-    if (pos == nullptr || (strcmp(pos, header) != 0)) {
+    if (memcmp(header, nesSign, 4) != 0) {
         cerr << "Unrecognized header" << endl;
         return false;
     }

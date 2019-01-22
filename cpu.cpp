@@ -1,9 +1,6 @@
 #include <iostream>
-#include <exception>
-#include <string>
 
 #include "cpu.hpp"
-#include "cartridge.hpp"
 
 using namespace std;
 
@@ -514,12 +511,13 @@ void CPU::SBC_ABS_X() {}
 void CPU::INC_ABS_X() {}
 
 int main(int argc, char const *argv[]) {
-    if(argc < 2){
+    if (argc < 2) {
         cerr << "Usage\n\tcpu <ROM>" << endl;
         exit(1);
     }
     string testRom(argv[1]);
     cout << "Testing ROM: " << testRom << endl;
     CPU cpu(testRom);
-    cpu.exec();
+    cpu.exec();;
+    return 0;
 }
