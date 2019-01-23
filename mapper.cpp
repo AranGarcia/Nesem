@@ -25,6 +25,5 @@ uint8_t Mapper::read(uint16_t addr) const {
 	/*
 	 * Does no bank switching
 	 */
-	addr -= 0x8000;
 	return prgROM[addr];
 }

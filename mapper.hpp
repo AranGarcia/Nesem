@@ -13,18 +13,21 @@
  */
 class Mapper {
 public:
-	Mapper(uint8_t *, uint8_t *, uint8_t *, size_t, size_t, size_t);
-	~Mapper();
+    Mapper(uint8_t *, uint8_t *, uint8_t *, size_t, size_t, size_t);
 
-	uint8_t read(uint16_t) const;
+    ~Mapper();
+
+    uint8_t read(uint16_t) const;
+
 protected:
-	uint8_t *prgROM;
-	uint8_t *chrROM;
-	uint8_t *prgRAM;
+    uint8_t *prgROM;
+    uint8_t *chrROM;
+    uint8_t *prgRAM;
 
-	// Number of banks in the cartridge
-	size_t prgROMBanks;		// Bank size: 16 KB
-	size_t chrROMBanks;		// Bank size: 8 KB
-	size_t prgRAMBanks;		// Bank size: 8 KB
+    // Number of banks in the cartridge
+    size_t prgROMBanks;        // Bank size: 16 KB
+    size_t chrROMBanks;        // Bank size: 8 KB
+    size_t prgRAMBanks;        // Bank size: 8 KB
 };
+
 #endif

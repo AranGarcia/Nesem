@@ -1,39 +1,40 @@
 #include <iostream>
+#include <iomanip>
 
 #include "cpu.hpp"
 
 using namespace std;
 
-CPU::CPU(string nesFile) : cart(nesFile), instructions{
+CPU::CPU(string nesFile) : cart(nesFile), p(0), instructions{
         &CPU::BRK_IMPL, &CPU::ORA_X_IND, nullptr, nullptr, nullptr, &CPU::ORA_ZPG, &CPU::ASL_ZPG, nullptr,
         &CPU::PHP_IMPL, &CPU::ORA_IMD, &CPU::ASL_A, nullptr, nullptr, &CPU::ORA_ABS, &CPU::ASL_ABS, nullptr,
 
         &CPU::BPL_REL, &CPU::ORA_IND_Y, nullptr, nullptr, nullptr, &CPU::ORA_ZPG_X, &CPU::ASL_ZPG_X, nullptr,
-        &CPU::CLC_IMPLE, &CPU::ORA_ABS_Y, nullptr, nullptr, nullptr, &CPU::ORA_ABS_X, &CPU::ASL_ABS_X, nullptr,
+        &CPU::CLC_IMPL, &CPU::ORA_ABS_Y, nullptr, nullptr, nullptr, &CPU::ORA_ABS_X, &CPU::ASL_ABS_X, nullptr,
 
         &CPU::JSR_ABS, &CPU::AND_X_IND, nullptr, nullptr, &CPU::BIT_ZPG, &CPU::AND_ZPG, &CPU::ROL_ZPG, nullptr,
-        &CPU::PLP_IMPLE, &CPU::AND_IMD, &CPU::ROL_A, nullptr, &CPU::BIT_ABS, &CPU::AND_ABS, &CPU::ROL_ABS, nullptr,
+        &CPU::PLP_IMPL, &CPU::AND_IMD, &CPU::ROL_A, nullptr, &CPU::BIT_ABS, &CPU::AND_ABS, &CPU::ROL_ABS, nullptr,
 
         &CPU::BMI_REL, &CPU::AND_IND_Y, nullptr, nullptr, nullptr, &CPU::AND_ZPG_X, &CPU::ROL_ZPG_X, nullptr,
-        &CPU::SEC_IMPLE, &CPU::AND_ABS_Y, nullptr, nullptr, nullptr, &CPU::AND_ABS_X, &CPU::ROL_ABS_X, nullptr,
+        &CPU::SEC_IMPL, &CPU::AND_ABS_Y, nullptr, nullptr, nullptr, &CPU::AND_ABS_X, &CPU::ROL_ABS_X, nullptr,
 
-        &CPU::RTI_IMPLE, &CPU::EOR_X_IND, nullptr, nullptr, nullptr, &CPU::EOR_ZPG, &CPU::LSR_ZPG, nullptr,
-        &CPU::PHA_IMPLE, &CPU::EOR_IMD, &CPU::LSR_A, nullptr, &CPU::JMP_ABS, &CPU::EOR_ABS, &CPU::LSR_ABS, nullptr,
+        &CPU::RTI_IMPL, &CPU::EOR_X_IND, nullptr, nullptr, nullptr, &CPU::EOR_ZPG, &CPU::LSR_ZPG, nullptr,
+        &CPU::PHA_IMPL, &CPU::EOR_IMD, &CPU::LSR_A, nullptr, &CPU::JMP_ABS, &CPU::EOR_ABS, &CPU::LSR_ABS, nullptr,
 
         &CPU::BVC_REL, &CPU::EOR_IND_Y, nullptr, nullptr, nullptr, &CPU::EOR_ZPG_X, &CPU::LSR_ZPG_X, nullptr,
-        &CPU::CLI_IMPLE, &CPU::EOR_ABS_Y, nullptr, nullptr, nullptr, &CPU::EOR_ABS_X, &CPU::LSR_ABS_X, nullptr,
+        &CPU::CLI_IMPL, &CPU::EOR_ABS_Y, nullptr, nullptr, nullptr, &CPU::EOR_ABS_X, &CPU::LSR_ABS_X, nullptr,
 
-        &CPU::RTS_IMPLE, &CPU::ADC_X_IND, nullptr, nullptr, nullptr, &CPU::ADC_ZPG, &CPU::ROR_ZPG, nullptr,
-        &CPU::PLA_IMPLE, &CPU::ADC_IMD, &CPU::ROR_A, nullptr, &CPU::JMP_IND, &CPU::ADC_ABS, &CPU::ROR_ABS, nullptr,
+        &CPU::RTS_IMPL, &CPU::ADC_X_IND, nullptr, nullptr, nullptr, &CPU::ADC_ZPG, &CPU::ROR_ZPG, nullptr,
+        &CPU::PLA_IMPL, &CPU::ADC_IMD, &CPU::ROR_A, nullptr, &CPU::JMP_IND, &CPU::ADC_ABS, &CPU::ROR_ABS, nullptr,
 
         &CPU::BVS_REL, &CPU::ADC_IND_Y, nullptr, nullptr, nullptr, &CPU::ADC_ZPG_X, &CPU::ROR_ZPG_X, nullptr,
-        &CPU::SEI_IMPLE, &CPU::ADC_ABS_Y, nullptr, nullptr, nullptr, &CPU::ADC_ABS_X, &CPU::ROR_ABS_X, nullptr,
+        &CPU::SEI_IMPL, &CPU::ADC_ABS_Y, nullptr, nullptr, nullptr, &CPU::ADC_ABS_X, &CPU::ROR_ABS_X, nullptr,
 
         nullptr, &CPU::STA_X_IND, nullptr, nullptr, &CPU::STY_ZPG, &CPU::STA_ZPG, &CPU::STX_ZPG, nullptr,
-        &CPU::DEY_IMPLE, nullptr, &CPU::TXA_IMPLE, nullptr, &CPU::STY_ABS, &CPU::STA_ABS, &CPU::STX_ABS, nullptr,
+        &CPU::DEY_IMPL, nullptr, &CPU::TXA_IMPL, nullptr, &CPU::STY_ABS, &CPU::STA_ABS, &CPU::STX_ABS, nullptr,
 
         &CPU::BCC_REL, &CPU::STA_IND_Y, nullptr, nullptr, &CPU::STY_ZPG_X, &CPU::STA_ZPG_X, &CPU::STX_ZPG_Y, nullptr,
-        &CPU::TYA_IMPLE, &CPU::STA_ABS_Y, &CPU::TXS_IMPLE, nullptr, nullptr, &CPU::STA_ABS_X, nullptr, nullptr,
+        &CPU::TYA_IMPL, &CPU::STA_ABS_Y, &CPU::TXS_IMPL, nullptr, nullptr, &CPU::STA_ABS_X, nullptr, nullptr,
 
         &CPU::LDY_IMD, &CPU::LDA_X_IND, &CPU::LDX_IMD, nullptr, &CPU::LDY_ZPG, &CPU::LDA_ZPG, &CPU::LDX_ZPG, nullptr,
         &CPU::TAY_IMPL, &CPU::LDA_IMD, &CPU::TAX_IMPL, nullptr, &CPU::LDY_ABS, &CPU::LDA_ABS, &CPU::LDX_ABS, nullptr,
@@ -53,9 +54,67 @@ CPU::CPU(string nesFile) : cart(nesFile), instructions{
 
         &CPU::BEQ_REL, &CPU::SBC_IND_Y, nullptr, nullptr, nullptr, &CPU::SBC_ZPG_X, &CPU::INC_ZPG_X, nullptr,
         &CPU::SED_IMPL, &CPU::SBC_ABS_Y, nullptr, nullptr, nullptr, &CPU::SBC_ABS_X, &CPU::INC_ABS_X, nullptr} {
+    // Reset program counter and processor status to 0
+    pc = 0;
 }
 
-void CPU::exec() { (this->*instructions[cart.read(pc)])(); }
+void CPU::exec() {
+    cout << "PC: " << pc << "\tInstruction: " << (int) cart.read(pc) << "(0x" << hex << (int) cart.read(pc) << ")"
+         << resetiosflags(ios::basefield) << "\tP:" << p.to_string() << "\tA:" << (unsigned int) a
+         << "\tX:" << (unsigned int) x << "\tY:" << (unsigned int) y << "\tSP:" << (unsigned int) sp << endl;
+    (this->*instructions[cart.read(pc++)])();
+}
+
+/**
+ * Gives access to different components through the memory map. If
+ * write is true, then the third parameter, data, shall be written in
+ * the mapped component.
+ *
+ * @param addr
+ * @param write
+ * @param data
+ * @return
+ */
+uint8_t CPU::mapMemory(uint16_t addr, bool write, uint16_t data) {
+    cout << "\tMemory access:" << hex << "0x" << addr << resetiosflags(ios::basefield);
+    if (addr < 0x100) {
+        // Zero page
+        cout << "\tZero Page" << endl;
+    } else if (addr < 0x200) {
+        //Stack
+        cout << "\tStack" << endl;
+    } else if (addr < 0x800) {
+        // RAM
+        cout << "\tRAM" << endl;
+    } else if (addr < 0x2000) {
+        // Mirrors of the last three sections
+    } else if (addr < 0x2008) {
+        cout << "\tI/O Registers" << endl;
+        // I/O Registers
+        //TODO: Probably should implement PPU Registers
+        if (write) {
+            addr - 0x2000;
+        } else {
+            return addr - 0x2000;
+        }
+    } else if (addr < 0x4000) {
+        // Mirrors of 0x2000 - 0x2007
+    } else if (addr < 0x4020) {
+        // I/O Registers
+        // TODO: Implement APU
+    } else if (addr < 0x6000) {
+        // Expansion ROM
+        cout << "\tExpansion ROM" << endl;
+    } else if (addr < 0x8000) {
+        // SRAM
+        cout << "\tSRAM" << endl;
+    } else {
+        // PRG-ROM, lower and upper bank
+        return cart.read(addr);
+    }
+
+    return 0;
+}
 
 // Op. Code: 0x00
 void CPU::BRK_IMPL() {}
@@ -85,7 +144,7 @@ void CPU::ORA_ABS() {}
 void CPU::ASL_ABS() {}
 
 // Op. Code: 0x10
-void CPU::BPL_REL() {}
+void CPU::BPL_REL() { p.test(7) ? pc += cart.read(pc) + 1 : ++pc; }
 
 // Op. Code: 0x11
 void CPU::ORA_IND_Y() {}
@@ -97,7 +156,7 @@ void CPU::ORA_ZPG_X() {}
 void CPU::ASL_ZPG_X() {}
 
 // Op. Code: 0x18
-void CPU::CLC_IMPLE() {}
+void CPU::CLC_IMPL() {}
 
 // Op. Code: 0x19
 void CPU::ORA_ABS_Y() {}
@@ -124,7 +183,7 @@ void CPU::AND_ZPG() {}
 void CPU::ROL_ZPG() {}
 
 // Op. Code: 0x28
-void CPU::PLP_IMPLE() {}
+void CPU::PLP_IMPL() {}
 
 // Op. Code: 0x29
 void CPU::AND_IMD() {}
@@ -154,7 +213,7 @@ void CPU::AND_ZPG_X() {}
 void CPU::ROL_ZPG_X() {}
 
 // Op. Code: 0x38
-void CPU::SEC_IMPLE() {}
+void CPU::SEC_IMPL() {}
 
 // Op. Code: 0x39
 void CPU::AND_ABS_Y() {}
@@ -166,7 +225,7 @@ void CPU::AND_ABS_X() {}
 void CPU::ROL_ABS_X() {}
 
 // Op. Code: 0x40
-void CPU::RTI_IMPLE() {}
+void CPU::RTI_IMPL() {}
 
 // Op. Code: 0x41
 void CPU::EOR_X_IND() {}
@@ -178,7 +237,7 @@ void CPU::EOR_ZPG() {}
 void CPU::LSR_ZPG() {}
 
 // Op. Code: 0x48
-void CPU::PHA_IMPLE() {}
+void CPU::PHA_IMPL() {}
 
 // Op. Code: 0x49
 void CPU::EOR_IMD() {}
@@ -208,7 +267,7 @@ void CPU::EOR_ZPG_X() {}
 void CPU::LSR_ZPG_X() {}
 
 // Op. Code: 0x58
-void CPU::CLI_IMPLE() {}
+void CPU::CLI_IMPL() {}
 
 // Op. Code: 0x59
 void CPU::EOR_ABS_Y() {}
@@ -220,7 +279,7 @@ void CPU::EOR_ABS_X() {}
 void CPU::LSR_ABS_X() {}
 
 // Op. Code: 0x60
-void CPU::RTS_IMPLE() {}
+void CPU::RTS_IMPL() {}
 
 // Op. Code: 0x61
 void CPU::ADC_X_IND() {}
@@ -232,7 +291,7 @@ void CPU::ADC_ZPG() {}
 void CPU::ROR_ZPG() {}
 
 // Op. Code: 0x68
-void CPU::PLA_IMPLE() {}
+void CPU::PLA_IMPL() {}
 
 // Op. Code: 0x69
 void CPU::ADC_IMD() {}
@@ -262,7 +321,7 @@ void CPU::ADC_ZPG_X() {}
 void CPU::ROR_ZPG_X() {}
 
 // Op. Code: 0x78
-void CPU::SEI_IMPLE() {}
+void CPU::SEI_IMPL() { p.set(2); }
 
 // Op. Code: 0x79
 void CPU::ADC_ABS_Y() {}
@@ -286,16 +345,19 @@ void CPU::STA_ZPG() {}
 void CPU::STX_ZPG() {}
 
 // Op. Code: 0x88
-void CPU::DEY_IMPLE() {}
+void CPU::DEY_IMPL() {}
 
 // Op. Code: 0x8A
-void CPU::TXA_IMPLE() {}
+void CPU::TXA_IMPL() {}
 
 // Op. Code: 0x8C
 void CPU::STY_ABS() {}
 
 // Op. Code: 0x8D
-void CPU::STA_ABS() {}
+void CPU::STA_ABS() {
+    uint16_t addr = cart.read(pc++) | (cart.read(pc++) << 8);
+    mapMemory(addr, true, a);
+}
 
 // Op. Code: 0x8E
 void CPU::STX_ABS() {}
@@ -316,13 +378,13 @@ void CPU::STA_ZPG_X() {}
 void CPU::STX_ZPG_Y() {}
 
 // Op. Code: 0x98
-void CPU::TYA_IMPLE() {}
+void CPU::TYA_IMPL() {}
 
 // Op. Code: 0x99
 void CPU::STA_ABS_Y() {}
 
 // Op. Code: 0x9A
-void CPU::TXS_IMPLE() {}
+void CPU::TXS_IMPL() { sp = x; }
 
 // Op. Code: 0x9D
 void CPU::STA_ABS_X() {}
@@ -334,7 +396,7 @@ void CPU::LDY_IMD() {}
 void CPU::LDA_X_IND() {}
 
 // Op. Code: 0xA2
-void CPU::LDX_IMD() {}
+void CPU::LDX_IMD() { x = cart.read(pc++); }
 
 // Op. Code: 0xA4
 void CPU::LDY_ZPG() {}
@@ -349,7 +411,7 @@ void CPU::LDX_ZPG() {}
 void CPU::TAY_IMPL() {}
 
 // Op. Code: 0xA9
-void CPU::LDA_IMD() {}
+void CPU::LDA_IMD() { a = cart.read(pc++); }
 
 // Op. Code: 0xAA
 void CPU::TAX_IMPL() {}
@@ -358,7 +420,10 @@ void CPU::TAX_IMPL() {}
 void CPU::LDY_ABS() {}
 
 // Op. Code: 0xAD
-void CPU::LDA_ABS() {}
+void CPU::LDA_ABS() {
+    uint16_t addr = cart.read(pc++) | (cart.read(pc++) << 8);
+    a = mapMemory(addr);
+}
 
 // Op. Code: 0xAE
 void CPU::LDX_ABS() {}
@@ -442,7 +507,7 @@ void CPU::CMP_ZPG_X() {}
 void CPU::DEC_ZPG_X() {}
 
 // Op. Code: 0xD8
-void CPU::CLD_IMPL() {}
+void CPU::CLD_IMPL() { p.set(3); }
 
 // Op. Code: 0xD9
 void CPU::CMP_ABS_Y() {}
@@ -518,6 +583,10 @@ int main(int argc, char const *argv[]) {
     string testRom(argv[1]);
     cout << "Testing ROM: " << testRom << endl;
     CPU cpu(testRom);
-    cpu.exec();;
+    for (int i = 0; i < 11; ++i) {
+        cpu.exec();
+    }
+
+    cout << "CPU test finished." << endl;
     return 0;
 }

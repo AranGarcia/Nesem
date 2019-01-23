@@ -2,6 +2,7 @@
 #define CPU_H
 
 #include <array>
+#include <bitset>
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -25,12 +26,16 @@ private:
     uint8_t a;   // Accumulator
     uint8_t x;   // Index X
     uint8_t y;   // Index Y
-    uint8_t p;   // Processor status
+    std::bitset<8> p;   // Processor status
     uint16_t pc; // Program counter
     uint8_t sp;  //Stack pointer
     std::array<uint8_t, 0x800> ram;
 
-    // Instructions
+    uint8_t mapMemory(uint16_t addr, bool = false, uint16_t = 0);
+
+    // Instructions}
+    std::array<F, 256> instructions;
+
     void BRK_IMPL();  //0x00
     void ORA_X_IND(); //0x01
     void ORA_ZPG();   //0x05
@@ -45,7 +50,7 @@ private:
     void ORA_IND_Y(); //0x11
     void ORA_ZPG_X(); //0x15
     void ASL_ZPG_X(); //0x16
-    void CLC_IMPLE(); //0x18
+    void CLC_IMPL(); //0x18
     void ORA_ABS_Y(); //0x19
     void ORA_ABS_X(); //0x1D
     void ASL_ABS_X(); //0x1E
@@ -55,7 +60,7 @@ private:
     void BIT_ZPG();   //0x24
     void AND_ZPG();   //0x25
     void ROL_ZPG();   //0x26
-    void PLP_IMPLE(); //0x28
+    void PLP_IMPL(); //0x28
     void AND_IMD();   //0x29
     void ROL_A();     //0x2A
     void BIT_ABS();   //0x2C
@@ -66,16 +71,16 @@ private:
     void AND_IND_Y(); //0x31
     void AND_ZPG_X(); //0x35
     void ROL_ZPG_X(); //0x36
-    void SEC_IMPLE(); //0x38
+    void SEC_IMPL(); //0x38
     void AND_ABS_Y(); //0x39
     void AND_ABS_X(); //0x3D
     void ROL_ABS_X(); //0x3E
 
-    void RTI_IMPLE(); //0x40
+    void RTI_IMPL(); //0x40
     void EOR_X_IND(); //0x41
     void EOR_ZPG();   //0x45
     void LSR_ZPG();   //0x46
-    void PHA_IMPLE(); //0x48
+    void PHA_IMPL(); //0x48
     void EOR_IMD();   //0x49
     void LSR_A();     //0x4A
     void JMP_ABS();   //0x4C
@@ -86,16 +91,16 @@ private:
     void EOR_IND_Y(); //0x51
     void EOR_ZPG_X(); //0x55
     void LSR_ZPG_X(); //0x56
-    void CLI_IMPLE(); //0x58
+    void CLI_IMPL(); //0x58
     void EOR_ABS_Y(); //0x59
     void EOR_ABS_X(); //0x5D
     void LSR_ABS_X(); //0x5E
 
-    void RTS_IMPLE(); //0x60
+    void RTS_IMPL(); //0x60
     void ADC_X_IND(); //0x61
     void ADC_ZPG();   //0x65
     void ROR_ZPG();   //0x66
-    void PLA_IMPLE(); //0x68
+    void PLA_IMPL(); //0x68
     void ADC_IMD();   //0x69
     void ROR_A();     //0x6A
     void JMP_IND();   //0x6C
@@ -106,7 +111,7 @@ private:
     void ADC_IND_Y(); //0x71
     void ADC_ZPG_X(); //0x75
     void ROR_ZPG_X(); //0x76
-    void SEI_IMPLE(); //0x78
+    void SEI_IMPL(); //0x78
     void ADC_ABS_Y(); //0x79
     void ADC_ABS_X(); //0x7D
     void ROR_ABS_X(); //0x7E
@@ -115,8 +120,8 @@ private:
     void STY_ZPG();   //0x84
     void STA_ZPG();   //0x85
     void STX_ZPG();   //0x86
-    void DEY_IMPLE(); //0x88
-    void TXA_IMPLE(); //0x8A
+    void DEY_IMPL(); //0x88
+    void TXA_IMPL(); //0x8A
     void STY_ABS();   //0x8C
     void STA_ABS();   //0x8D
     void STX_ABS();   //0x8E
@@ -126,9 +131,9 @@ private:
     void STY_ZPG_X(); //0x94
     void STA_ZPG_X(); //0x95
     void STX_ZPG_Y(); //0x96
-    void TYA_IMPLE(); //0x98
+    void TYA_IMPL(); //0x98
     void STA_ABS_Y(); //0x99
-    void TXS_IMPLE(); //0x9A
+    void TXS_IMPL(); //0x9A
     void STA_ABS_X(); //0x9D
 
     void LDY_IMD();    //0xA0
@@ -198,7 +203,6 @@ private:
     void SBC_ABS_X(); //0xFD
     void INC_ABS_X(); //0xFE
 
-    std::array<F, 256> instructions;
 };
 
 #endif
