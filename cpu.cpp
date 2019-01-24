@@ -55,7 +55,7 @@ CPU::CPU(string nesFile) : cart(nesFile), p(0), instructions{
         &CPU::BEQ_REL, &CPU::SBC_IND_Y, nullptr, nullptr, nullptr, &CPU::SBC_ZPG_X, &CPU::INC_ZPG_X, nullptr,
         &CPU::SED_IMPL, &CPU::SBC_ABS_Y, nullptr, nullptr, nullptr, &CPU::SBC_ABS_X, &CPU::INC_ABS_X, nullptr} {
     // Reset program counter and processor status to 0
-    pc = 0;
+    pc = 0x00;
 }
 
 void CPU::exec() {
@@ -75,17 +75,29 @@ void CPU::exec() {
  * @param data
  * @return
  */
-uint8_t CPU::mapMemory(uint16_t addr, bool write, uint16_t data) {
-    cout << "\tMemory access:" << hex << "0x" << addr << resetiosflags(ios::basefield);
+uint8_t CPU::mapMemory(uint16_t addr, bool write, uint8_t data) {
+    string op = write ? "WRITE" : "READ";
+    cout << "\tMemory access (" << op << "): " << hex << "0x" << addr << resetiosflags(ios::basefield);
+
     if (addr < 0x100) {
         // Zero page
         cout << "\tZero Page" << endl;
+        if (write) {
+            zeroPage[addr] = data;
+        } else {
+            return zeroPage[addr];
+        }
     } else if (addr < 0x200) {
         //Stack
         cout << "\tStack" << endl;
     } else if (addr < 0x800) {
         // RAM
         cout << "\tRAM" << endl;
+        if (write) {
+            ram[addr - 0x200] = data;
+        } else {
+            return ram[addr - 0x200];
+        }
     } else if (addr < 0x2000) {
         // Mirrors of the last three sections
     } else if (addr < 0x2008) {
@@ -93,9 +105,7 @@ uint8_t CPU::mapMemory(uint16_t addr, bool write, uint16_t data) {
         // I/O Registers
         //TODO: Probably should implement PPU Registers
         if (write) {
-            addr - 0x2000;
         } else {
-            return addr - 0x2000;
         }
     } else if (addr < 0x4000) {
         // Mirrors of 0x2000 - 0x2007
@@ -120,7 +130,11 @@ uint8_t CPU::mapMemory(uint16_t addr, bool write, uint16_t data) {
 void CPU::BRK_IMPL() {}
 
 // Op. Code: 0x01
-void CPU::ORA_X_IND() {}
+void CPU::ORA_X_IND() {
+    a |= mapMemory(cart.read(pc++));
+    p.set(1, a == 0);
+    p.set(7, a & 0x800);
+}
 
 // Op. Code: 0x05
 void CPU::ORA_ZPG() {}
@@ -144,7 +158,14 @@ void CPU::ORA_ABS() {}
 void CPU::ASL_ABS() {}
 
 // Op. Code: 0x10
-void CPU::BPL_REL() { p.test(7) ? pc += cart.read(pc) + 1 : ++pc; }
+void CPU::BPL_REL() {
+    if (!p.test(7)) {
+        int8_t jump = cart.read(pc++);
+        pc += jump;
+    } else {
+        ++pc;
+    }
+}
 
 // Op. Code: 0x11
 void CPU::ORA_IND_Y() {}
@@ -354,10 +375,7 @@ void CPU::TXA_IMPL() {}
 void CPU::STY_ABS() {}
 
 // Op. Code: 0x8D
-void CPU::STA_ABS() {
-    uint16_t addr = cart.read(pc++) | (cart.read(pc++) << 8);
-    mapMemory(addr, true, a);
-}
+void CPU::STA_ABS() { mapMemory(cart.read(pc++) | (cart.read(pc++) << 8), true, a); }
 
 // Op. Code: 0x8E
 void CPU::STX_ABS() {}
@@ -395,8 +413,12 @@ void CPU::LDY_IMD() {}
 // Op. Code: 0xA1
 void CPU::LDA_X_IND() {}
 
-// Op. Code: 0xA2
-void CPU::LDX_IMD() { x = cart.read(pc++); }
+// Op. Code: 0xA2}
+void CPU::LDX_IMD() {
+    x = cart.read(pc++);
+    p.set(1, x == 0);
+    p.set(7, x & 0x80);
+}
 
 // Op. Code: 0xA4
 void CPU::LDY_ZPG() {}
@@ -411,7 +433,11 @@ void CPU::LDX_ZPG() {}
 void CPU::TAY_IMPL() {}
 
 // Op. Code: 0xA9
-void CPU::LDA_IMD() { a = cart.read(pc++); }
+void CPU::LDA_IMD() {
+    a = cart.read(pc++);
+    p.set(1, a == 0);
+    p.set(7, a & 0x80);
+}
 
 // Op. Code: 0xAA
 void CPU::TAX_IMPL() {}
@@ -421,8 +447,9 @@ void CPU::LDY_ABS() {}
 
 // Op. Code: 0xAD
 void CPU::LDA_ABS() {
-    uint16_t addr = cart.read(pc++) | (cart.read(pc++) << 8);
-    a = mapMemory(addr);
+    a = mapMemory(cart.read(pc++) | (cart.read(pc++) << 8));
+    p.set(1, a == 0);
+    p.set(7, a & 0x80);
 }
 
 // Op. Code: 0xAE
@@ -456,7 +483,11 @@ void CPU::TSX_IMPL() {}
 void CPU::LDY_ABS_X() {}
 
 // Op. Code: 0xBD
-void CPU::LDA_ABS_X() {}
+void CPU::LDA_ABS_X() {
+    x = cart.read(pc++) | (cart.read(pc++) << 8);
+    p.set(1, x == 0);
+    p.set(7, x & 0x80);
+}
 
 // Op. Code: 0xBE
 void CPU::LDX_ABS_Y() {}
@@ -507,7 +538,7 @@ void CPU::CMP_ZPG_X() {}
 void CPU::DEC_ZPG_X() {}
 
 // Op. Code: 0xD8
-void CPU::CLD_IMPL() { p.set(3); }
+void CPU::CLD_IMPL() { p.set(3, false); }
 
 // Op. Code: 0xD9
 void CPU::CMP_ABS_Y() {}
@@ -516,7 +547,10 @@ void CPU::CMP_ABS_Y() {}
 void CPU::CMP_ABS_X() {}
 
 // Op. Code: 0xDE
-void CPU::DEC_ABS_X() {}
+void CPU::DEC_ABS_X() {
+    uint16_t addr = cart.read(pc++) | (cart.read(pc++) << 8);
+    mapMemory(addr, true, mapMemory(addr) - 1);
+}
 
 // Op. Code: 0xE0
 void CPU::CPX_IMD() {}
@@ -552,7 +586,7 @@ void CPU::SBC_ABS() {}
 void CPU::INC_ABS() {}
 
 // Op. Code: 0xF0
-void CPU::BEQ_REL() {}
+void CPU::BEQ_REL() { p.test(1) ? pc += cart.read(pc++) : ++pc; }
 
 // Op. Code: 0xF1
 void CPU::SBC_IND_Y() {}
@@ -583,7 +617,7 @@ int main(int argc, char const *argv[]) {
     string testRom(argv[1]);
     cout << "Testing ROM: " << testRom << endl;
     CPU cpu(testRom);
-    for (int i = 0; i < 11; ++i) {
+    for (int i = 0; i < 20; ++i) {
         cpu.exec();
     }
 

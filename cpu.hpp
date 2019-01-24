@@ -29,13 +29,25 @@ private:
     std::bitset<8> p;   // Processor status
     uint16_t pc; // Program counter
     uint8_t sp;  //Stack pointer
-    std::array<uint8_t, 0x800> ram;
+    std::array<uint8_t, 0x100> zeroPage;
+    std::array<uint8_t, 0xFF> stack;
+    std::array<uint8_t, 0x600> ram;
 
-    uint8_t mapMemory(uint16_t addr, bool = false, uint16_t = 0);
+    uint8_t mapMemory(uint16_t addr, bool = false, uint8_t = 0);
 
     // Instructions}
     std::array<F, 256> instructions;
 
+    /* ----------------------
+     * Instruction suffixes:
+     * ----------------------
+     * ABS:     |   Absolute
+     * IMD:     |   Immediate
+     * IMPL:    |   Implied
+     * IND:     |   Indirect
+     * REL:     |   Relative
+     * ZPG:     |   Zero Page
+     */
     void BRK_IMPL();  //0x00
     void ORA_X_IND(); //0x01
     void ORA_ZPG();   //0x05
