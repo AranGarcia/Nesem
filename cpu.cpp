@@ -62,7 +62,7 @@ CPU::CPU(string nesFile) : cart(std::move(nesFile)), p(0), instructions{
 }
 
 void CPU::exec() {
-    cout << "PC: " << pc << "\tInstruction: " << (int) cart.read(pc) << "(0x" << hex << (int) cart.read(pc) << ")"
+    cout << "PC: " << pc << "\t\tInstruction: " << (int) cart.read(pc) << "(0x" << hex << (int) cart.read(pc) << ")"
          << resetiosflags(ios::basefield) << "\tP:" << p.to_string() << "\tA:" << (unsigned int) a
          << "\tX:" << (unsigned int) x << "\tY:" << (unsigned int) y << "\tSP:" << (unsigned int) sp << endl;
     (this->*instructions[cart.read(pc++)])();
@@ -564,7 +564,11 @@ void CPU::CMP_IMD() {
 }
 
 // Op. Code: 0xCA
-void CPU::DEX_IMPL() { x -= 1; }
+void CPU::DEX_IMPL() {
+    x -= 1;
+    p.set(1, x == 0);
+    p.set(7, static_cast<bool>(x & 0x80));
+}
 
 // Op. Code: 0xCC
 void CPU::CPY_ABS() {}
@@ -676,7 +680,7 @@ int main(int argc, char const *argv[]) {
     string testRom(argv[1]);
     cout << "Testing ROM: " << testRom << endl;
     CPU cpu(testRom);
-    for (int i = 0; i < 100; ++i) {
+    for (int i = 0; i < 12000; ++i) {
         cpu.exec();
     }
 
