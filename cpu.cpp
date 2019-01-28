@@ -154,7 +154,7 @@ int16_t CPU::ext_s16(int8_t value) {
  */
 uint16_t CPU::stack_peek() { return stack[sp]; }
 
-uint16_t CPU::stack_pop() { return stack[sp++]; }
+uint16_t CPU::stack_pop() { return stack[++sp]; }
 
 void CPU::stack_push(uint16_t data) { stack[sp--] = data; }
 
@@ -328,7 +328,7 @@ void CPU::EOR_ABS_X() {}
 void CPU::LSR_ABS_X() {}
 
 // Op. Code: 0x60
-void CPU::RTS_IMPL() {}
+void CPU::RTS_IMPL() { pc = stack_pop(); }
 
 // Op. Code: 0x61
 void CPU::ADC_X_IND() {}
