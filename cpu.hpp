@@ -9,18 +9,23 @@
 #include <vector>
 
 #include "cartridge.hpp"
+#include "ppu.h"
 
+/**
+ * Implementation of a 6502 microprocessor
+ */
 class CPU {
 public:
     typedef void (CPU::*F)();
 
-    CPU(std::string);
+    explicit CPU(std::string);
 
     void exec();
 
 private:
     // Game Pak link
     Cartridge cart;
+    PPU ppu;
 
     // Registers
     uint8_t a;   // Accumulator
@@ -29,17 +34,29 @@ private:
     std::bitset<8> p;   // Processor status
     uint16_t pc; // Program counter
     uint8_t sp;  //Stack pointer
-    std::array<uint8_t, 0x100> zeroPage;
-    std::array<uint8_t, 0xFF> stack;
+    std::array<uint8_t, 0x100> zero_page;
+    std::array<uint16_t, 0x100> stack;
     std::array<uint8_t, 0x600> ram;
 
-    uint8_t mapMemory(uint16_t addr, bool = false, uint8_t = 0);
+    uint8_t map_memory(uint16_t addr, bool = false, uint8_t = 0);
+
+    // Signed byte extender
+
+    int16_t ext_s16(int8_t value);
+
+    // Stack functions
+
+    uint16_t stack_peek();
+
+    uint16_t stack_pop();
+
+    void stack_push(uint16_t );
 
     // Instructions}
     std::array<F, 256> instructions;
 
     /* ----------------------
-     * Instruction suffixes:
+     * Instruction  suffixes:
      * ----------------------
      * ABS:     |   Absolute
      * IMD:     |   Immediate

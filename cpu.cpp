@@ -1,3 +1,5 @@
+#include <utility>
+
 #include <iostream>
 #include <iomanip>
 
@@ -5,7 +7,7 @@
 
 using namespace std;
 
-CPU::CPU(string nesFile) : cart(nesFile), p(0), instructions{
+CPU::CPU(string nesFile) : cart(std::move(nesFile)), p(0), instructions{
         &CPU::BRK_IMPL, &CPU::ORA_X_IND, nullptr, nullptr, nullptr, &CPU::ORA_ZPG, &CPU::ASL_ZPG, nullptr,
         &CPU::PHP_IMPL, &CPU::ORA_IMD, &CPU::ASL_A, nullptr, nullptr, &CPU::ORA_ABS, &CPU::ASL_ABS, nullptr,
 
@@ -56,6 +58,7 @@ CPU::CPU(string nesFile) : cart(nesFile), p(0), instructions{
         &CPU::SED_IMPL, &CPU::SBC_ABS_Y, nullptr, nullptr, nullptr, &CPU::SBC_ABS_X, &CPU::INC_ABS_X, nullptr} {
     // Reset program counter and processor status to 0
     pc = 0x00;
+    sp = 0x00;
 }
 
 void CPU::exec() {
@@ -70,29 +73,26 @@ void CPU::exec() {
  * write is true, then the third parameter, data, shall be written in
  * the mapped component.
  *
- * @param addr
- * @param write
- * @param data
+ * @param addr 16 bit address
+ * @param write If true, the third parameter will be written in the components address (if possible)
+ * @param data 8 bit data
  * @return
  */
-uint8_t CPU::mapMemory(uint16_t addr, bool write, uint8_t data) {
+uint8_t CPU::map_memory(uint16_t addr, bool write, uint8_t data) {
     string op = write ? "WRITE" : "READ";
-    cout << "\tMemory access (" << op << "): " << hex << "0x" << addr << resetiosflags(ios::basefield);
+    cout << "\tMemory access (" << op << "): " << hex << "0x" << addr << resetiosflags(ios::basefield) << endl;
 
     if (addr < 0x100) {
         // Zero page
-        cout << "\tZero Page" << endl;
         if (write) {
-            zeroPage[addr] = data;
+            zero_page[addr] = data;
         } else {
-            return zeroPage[addr];
+            return zero_page[addr];
         }
     } else if (addr < 0x200) {
         //Stack
-        cout << "\tStack" << endl;
     } else if (addr < 0x800) {
         // RAM
-        cout << "\tRAM" << endl;
         if (write) {
             ram[addr - 0x200] = data;
         } else {
@@ -100,12 +100,25 @@ uint8_t CPU::mapMemory(uint16_t addr, bool write, uint8_t data) {
         }
     } else if (addr < 0x2000) {
         // Mirrors of the last three sections
-    } else if (addr < 0x2008) {
-        cout << "\tI/O Registers" << endl;
-        // I/O Registers
-        //TODO: Probably should implement PPU Registers
+    } else if (addr == 0x2000) {
+        ppu.setPpuctrl(data);
+    } else if (addr == 0x2001) {
+        ppu.setPpumask(data);
+    } else if (addr == 0x2002) {
+        return ppu.getPpustatus();
+    } else if (addr == 0x2003) {
+        ppu.setOamaddr(data);
+    } else if (addr == 0x2004) {
         if (write) {
+            ppu.setOamdata(data);
         } else {
+            return ppu.getOamdata();
+        }
+    } else if (addr == 0x2007) {
+        if (write) {
+            ppu.setPpudata(data);
+        } else {
+            return ppu.getPpudata();
         }
     } else if (addr < 0x4000) {
         // Mirrors of 0x2000 - 0x2007
@@ -114,10 +127,8 @@ uint8_t CPU::mapMemory(uint16_t addr, bool write, uint8_t data) {
         // TODO: Implement APU
     } else if (addr < 0x6000) {
         // Expansion ROM
-        cout << "\tExpansion ROM" << endl;
     } else if (addr < 0x8000) {
         // SRAM
-        cout << "\tSRAM" << endl;
     } else {
         // PRG-ROM, lower and upper bank
         return cart.read(addr);
@@ -126,14 +137,35 @@ uint8_t CPU::mapMemory(uint16_t addr, bool write, uint8_t data) {
     return 0;
 }
 
+/**
+ * Extends a 8 signed bit type to a 16 signed bit type,
+ * conserving the two's complement value.
+ *
+ * @param A signed 8 bit value
+ * @return A 16 bit representation of the parameter.
+ */
+int16_t CPU::ext_s16(int8_t value) {
+    auto pad = static_cast<uint16_t>((value & 0x80) == 0x80 ? 0xFF00 : 0x0000);
+    return pad | value;
+}
+
+/*
+ * Stack functions
+ */
+uint16_t CPU::stack_peek() { return stack[sp]; }
+
+uint16_t CPU::stack_pop() { return stack[sp++]; }
+
+void CPU::stack_push(uint16_t data) { stack[sp--] = data; }
+
 // Op. Code: 0x00
 void CPU::BRK_IMPL() {}
 
 // Op. Code: 0x01
 void CPU::ORA_X_IND() {
-    a |= mapMemory(cart.read(pc++));
+    a |= map_memory(cart.read(pc++));
     p.set(1, a == 0);
-    p.set(7, a & 0x800);
+    p.set(7, static_cast<bool>( a & 0x80));
 }
 
 // Op. Code: 0x05
@@ -158,14 +190,7 @@ void CPU::ORA_ABS() {}
 void CPU::ASL_ABS() {}
 
 // Op. Code: 0x10
-void CPU::BPL_REL() {
-    if (!p.test(7)) {
-        int8_t jump = cart.read(pc++);
-        pc += jump;
-    } else {
-        ++pc;
-    }
-}
+void CPU::BPL_REL() { !p.test(7) ? pc += ext_s16(cart.read(pc++)) : ++pc; }
 
 // Op. Code: 0x11
 void CPU::ORA_IND_Y() {}
@@ -189,7 +214,10 @@ void CPU::ORA_ABS_X() {}
 void CPU::ASL_ABS_X() {}
 
 // Op. Code: 0x20
-void CPU::JSR_ABS() {}
+void CPU::JSR_ABS() {
+    stack_push(static_cast<uint16_t>(pc + 2));
+    pc = static_cast<uint16_t>(cart.read(pc++) | (cart.read(pc++) << 8) - 0x8000);
+}
 
 // Op. Code: 0x21
 void CPU::AND_X_IND() {}
@@ -360,13 +388,17 @@ void CPU::STA_X_IND() {}
 void CPU::STY_ZPG() {}
 
 // Op. Code: 0x85
-void CPU::STA_ZPG() {}
+void CPU::STA_ZPG() { map_memory(cart.read(pc++), true, a); }
 
 // Op. Code: 0x86
-void CPU::STX_ZPG() {}
+void CPU::STX_ZPG() { map_memory(cart.read(pc++), true, x); }
 
 // Op. Code: 0x88
-void CPU::DEY_IMPL() {}
+void CPU::DEY_IMPL() {
+    y -= 1;
+    p.set(1, y == 0);
+    p.set(7, static_cast<bool>(y & 0x80));
+}
 
 // Op. Code: 0x8A
 void CPU::TXA_IMPL() {}
@@ -375,7 +407,7 @@ void CPU::TXA_IMPL() {}
 void CPU::STY_ABS() {}
 
 // Op. Code: 0x8D
-void CPU::STA_ABS() { mapMemory(cart.read(pc++) | (cart.read(pc++) << 8), true, a); }
+void CPU::STA_ABS() { map_memory(cart.read(pc++) | (cart.read(pc++) << 8), true, a); }
 
 // Op. Code: 0x8E
 void CPU::STX_ABS() {}
@@ -384,7 +416,11 @@ void CPU::STX_ABS() {}
 void CPU::BCC_REL() {}
 
 // Op. Code: 0x91
-void CPU::STA_IND_Y() {}
+void CPU::STA_IND_Y() {
+    uint8_t data = cart.read(pc++); // left padded zeroes: 0x00bb
+    uint16_t zpg_addr = (map_memory(static_cast<uint16_t>(data + 1)) << 8) | map_memory(data);
+    a = map_memory(zpg_addr + y);
+}
 
 // Op. Code: 0x94
 void CPU::STY_ZPG_X() {}
@@ -408,7 +444,11 @@ void CPU::TXS_IMPL() { sp = x; }
 void CPU::STA_ABS_X() {}
 
 // Op. Code: 0xA0
-void CPU::LDY_IMD() {}
+void CPU::LDY_IMD() {
+    y = cart.read(pc++);
+    p.set(1, y == 0);
+    p.set(7, static_cast<bool>( y & 0x80));
+}
 
 // Op. Code: 0xA1
 void CPU::LDA_X_IND() {}
@@ -417,7 +457,7 @@ void CPU::LDA_X_IND() {}
 void CPU::LDX_IMD() {
     x = cart.read(pc++);
     p.set(1, x == 0);
-    p.set(7, x & 0x80);
+    p.set(7, static_cast<bool>( x & 0x80));
 }
 
 // Op. Code: 0xA4
@@ -436,7 +476,7 @@ void CPU::TAY_IMPL() {}
 void CPU::LDA_IMD() {
     a = cart.read(pc++);
     p.set(1, a == 0);
-    p.set(7, a & 0x80);
+    p.set(7, static_cast<bool>( a & 0x80));
 }
 
 // Op. Code: 0xAA
@@ -447,16 +487,16 @@ void CPU::LDY_ABS() {}
 
 // Op. Code: 0xAD
 void CPU::LDA_ABS() {
-    a = mapMemory(cart.read(pc++) | (cart.read(pc++) << 8));
+    a = map_memory(cart.read(pc++) | (cart.read(pc++) << 8));
     p.set(1, a == 0);
-    p.set(7, a & 0x80);
+    p.set(7, static_cast<bool>(a & 0x80));
 }
 
 // Op. Code: 0xAE
 void CPU::LDX_ABS() {}
 
 // Op. Code: 0xB0
-void CPU::BCS_REL() {}
+void CPU::BCS_REL() { p.test(0) ? pc += cart.read(pc++) : ++pc; }
 
 // Op. Code: 0xB1
 void CPU::LDA_IND_Y() {}
@@ -484,16 +524,21 @@ void CPU::LDY_ABS_X() {}
 
 // Op. Code: 0xBD
 void CPU::LDA_ABS_X() {
-    x = cart.read(pc++) | (cart.read(pc++) << 8);
+    x = map_memory(cart.read(pc++) | (cart.read(pc++) << 8));
     p.set(1, x == 0);
-    p.set(7, x & 0x80);
+    p.set(7, static_cast<bool>(x & 0x80));
 }
 
 // Op. Code: 0xBE
 void CPU::LDX_ABS_Y() {}
 
 // Op. Code: 0xC0
-void CPU::CPY_IMD() {}
+void CPU::CPY_IMD() {
+    uint8_t data = map_memory(cart.read(pc++));
+    p.set(0, y >= data);
+    p.set(1, y == data);
+    p.set(7, (y - data) < 0);
+}
 
 // Op. Code: 0xC1
 void CPU::CMP_X_IND() {}
@@ -511,10 +556,15 @@ void CPU::DEC_ZPG() {}
 void CPU::INY_IMPL() {}
 
 // Op. Code: 0xC9
-void CPU::CMP_IMD() {}
+void CPU::CMP_IMD() {
+    uint8_t data = map_memory(cart.read(pc++));
+    p.set(0, a >= data);
+    p.set(1, a == data);
+    p.set(7, (a - data) < 0);
+}
 
 // Op. Code: 0xCA
-void CPU::DEX_IMPL() {}
+void CPU::DEX_IMPL() { x -= 1; }
 
 // Op. Code: 0xCC
 void CPU::CPY_ABS() {}
@@ -526,7 +576,7 @@ void CPU::CMP_ABS() {}
 void CPU::DEC_ABS() {}
 
 // Op. Code: 0xD0
-void CPU::BNE_REL() {}
+void CPU::BNE_REL() { !p.test(1) ? pc += ext_s16(cart.read(pc++)) : ++pc; }
 
 // Op. Code: 0xD1
 void CPU::CMP_IND_Y() {}
@@ -549,11 +599,18 @@ void CPU::CMP_ABS_X() {}
 // Op. Code: 0xDE
 void CPU::DEC_ABS_X() {
     uint16_t addr = cart.read(pc++) | (cart.read(pc++) << 8);
-    mapMemory(addr, true, mapMemory(addr) - 1);
+    uint8_t result;
+    result = static_cast<uint8_t>(map_memory(addr) - 1);
+    map_memory(addr, true, result);
 }
 
 // Op. Code: 0xE0
-void CPU::CPX_IMD() {}
+void CPU::CPX_IMD() {
+    uint8_t data = cart.read(pc++);
+    p.set(0, x >= data);
+    p.set(1, x == data);
+    p.set(7, (x - data) < 0);
+}
 
 // Op. Code: 0xE1
 void CPU::SBC_X_IND() {}
@@ -607,7 +664,9 @@ void CPU::SBC_ABS_Y() {}
 void CPU::SBC_ABS_X() {}
 
 // Op. Code: 0xFE
-void CPU::INC_ABS_X() {}
+void CPU::INC_ABS_X() {
+    //    map_memory(cart.read(pc++), true, map_memory(cart.read(pc)));
+}
 
 int main(int argc, char const *argv[]) {
     if (argc < 2) {
@@ -617,7 +676,7 @@ int main(int argc, char const *argv[]) {
     string testRom(argv[1]);
     cout << "Testing ROM: " << testRom << endl;
     CPU cpu(testRom);
-    for (int i = 0; i < 20; ++i) {
+    for (int i = 0; i < 100; ++i) {
         cpu.exec();
     }
 
