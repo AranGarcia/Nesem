@@ -1,5 +1,3 @@
-#include <utility>
-
 #include <iostream>
 #include <iomanip>
 
@@ -62,10 +60,11 @@ CPU::CPU(string nesFile) : cart(std::move(nesFile)), p(0), instructions{
 }
 
 void CPU::exec() {
-    cout << "PC: " << pc << "\t\tInstruction: " << (int) cart.read(pc) << "(0x" << hex << (int) cart.read(pc) << ")"
+    cout << "PC: " << pc << "\t\tInstruction: " << (int) cart.read_rom(pc) << "(0x" << hex << (int) cart.read_rom(pc)
+         << ")"
          << resetiosflags(ios::basefield) << "\tP:" << p.to_string() << "\tA:" << (unsigned int) a
          << "\tX:" << (unsigned int) x << "\tY:" << (unsigned int) y << "\tSP:" << (unsigned int) sp << endl;
-    (this->*instructions[cart.read(pc++)])();
+    (this->*instructions[cart.read_rom(pc++)])();
 }
 
 /**
@@ -82,63 +81,46 @@ uint8_t CPU::map_memory(uint16_t addr, bool write, uint8_t data) {
     string op = write ? "WRITE" : "READ";
     cout << "\tMemory access (" << op << "): " << hex << "0x" << addr << resetiosflags(ios::basefield) << endl;
 
-    if (addr < 0x100) {
-        // Zero page
-        if (write) {
-            zero_page[addr] = data;
+    if (addr < 0x100) {                             // Zero page
+        if (write) { zero_page[addr] = data; }
+        else { return zero_page[addr]; }
+    } else if (addr < 0x200) {                      //Stack
+    } else if (addr < 0x800) {                      // RAM
+        if (write) { ram[addr - 0x200] = data; }
+        else { return ram[addr - 0x200]; }
+    } else if (addr < 0x2000) {                     // Mirrors of the last three sections
+    } else if (addr < 0x2008) {                     // I/O Registers: PPU
+        if (addr == 0x2002) {
+            return ppu.read_ppustatus();
+        } else if (addr == 0x2007 && !write) {
+            return ppu.read_ppudata();
         } else {
-            return zero_page[addr];
+            ppu.access_registers(addr, data);
         }
-    } else if (addr < 0x200) {
-        //Stack
-    } else if (addr < 0x800) {
-        // RAM
-        if (write) {
-            ram[addr - 0x200] = data;
+    } else if (addr < 0x4000) {                     // Mirrors of 0x2000 - 0x2007
+    } else if (addr < 0x4020) {                     // I/O Registers: APU and Joystick
+        if (addr == 0x4014) {
+            ppu.access_registers(data, data);
+        } else if (addr == 0x4015 && !write) {
+            return apu.read_mstrctrl();
         } else {
-            return ram[addr - 0x200];
+            apu.access_registers(addr, data);
         }
-    } else if (addr < 0x2000) {
-        // Mirrors of the last three sections
-    } else if (addr == 0x2000) {
-        ppu.setPpuctrl(data);
-    } else if (addr == 0x2001) {
-        ppu.setPpumask(data);
-    } else if (addr == 0x2002) {
-        return ppu.getPpustatus();
-    } else if (addr == 0x2003) {
-        ppu.setOamaddr(data);
-    } else if (addr == 0x2004) {
-        if (write) {
-            ppu.setOamdata(data);
-        } else {
-            return ppu.getOamdata();
-        }
-    } else if (addr == 0x2007) {
-        if (write) {
-            ppu.setPpudata(data);
-        } else {
-            return ppu.getPpudata();
-        }
-    } else if (addr < 0x4000) {
-        // Mirrors of 0x2000 - 0x2007
-    } else if (addr < 0x4020) {
-        // I/O Registers
-        // TODO: Implement APU
-    } else if (addr < 0x6000) {
-        // Expansion ROM
-    } else if (addr < 0x8000) {
-        // SRAM
-    } else {
-        // PRG-ROM, lower and upper bank
-        return cart.read(addr);
+    } else if (addr < 0x6000) {                     // Expansion ROM
+        //TODO: No idea what this is
+    } else if (addr < 0x8000) {                     // SRAM
+        auto addr16 = static_cast<uint16_t>(addr - 0x6000);
+        if (write) { cart.rw_ram(addr16); }
+        else { return cart.rw_ram(addr16, write, data); }
+    } else {                                        // PRG-ROM, lower and upper bank
+        return cart.read_rom(addr);
     }
 
     return 0;
 }
 
 /**
- * Extends a 8 signed bit type to a 16 signed bit type,
+ * Extends an 8 signed bit type to a 16 signed bit type,
  * conserving the two's complement value.
  *
  * @param A signed 8 bit value
@@ -159,11 +141,13 @@ uint16_t CPU::stack_pop() { return stack[++sp]; }
 void CPU::stack_push(uint16_t data) { stack[sp--] = data; }
 
 // Op. Code: 0x00
-void CPU::BRK_IMPL() {}
+void CPU::BRK_IMPL() {
+    // TODO: Implement interrupts
+}
 
 // Op. Code: 0x01
 void CPU::ORA_X_IND() {
-    a |= map_memory(cart.read(pc++));
+    a |= map_memory(cart.read_rom(pc++));
     p.set(1, a == 0);
     p.set(7, static_cast<bool>( a & 0x80));
 }
@@ -190,7 +174,7 @@ void CPU::ORA_ABS() {}
 void CPU::ASL_ABS() {}
 
 // Op. Code: 0x10
-void CPU::BPL_REL() { !p.test(7) ? pc += ext_s16(cart.read(pc++)) : ++pc; }
+void CPU::BPL_REL() { !p.test(7) ? pc += ext_s16(cart.read_rom(pc++)) : ++pc; }
 
 // Op. Code: 0x11
 void CPU::ORA_IND_Y() {}
@@ -216,7 +200,7 @@ void CPU::ASL_ABS_X() {}
 // Op. Code: 0x20
 void CPU::JSR_ABS() {
     stack_push(static_cast<uint16_t>(pc + 2));
-    pc = static_cast<uint16_t>(cart.read(pc++) | (cart.read(pc++) << 8) - 0x8000);
+    pc = static_cast<uint16_t>(cart.read_rom(pc++) | (cart.read_rom(pc++) << 8) - 0x8000);
 }
 
 // Op. Code: 0x21
@@ -241,7 +225,12 @@ void CPU::AND_IMD() {}
 void CPU::ROL_A() {}
 
 // Op. Code: 0x2C
-void CPU::BIT_ABS() {}
+void CPU::BIT_ABS() {
+    uint8_t data = map_memory(cart.read_rom(pc++) | (cart.read_rom(pc++) << 8));
+    p.set(1, static_cast<bool>(data & a));
+    p.set(6, static_cast<bool>(data & 0x40));
+    p.set(7, static_cast<bool>(data & 0x80));
+}
 
 // Op. Code: 0x2D
 void CPU::AND_ABS() {}
@@ -388,10 +377,10 @@ void CPU::STA_X_IND() {}
 void CPU::STY_ZPG() {}
 
 // Op. Code: 0x85
-void CPU::STA_ZPG() { map_memory(cart.read(pc++), true, a); }
+void CPU::STA_ZPG() { map_memory(cart.read_rom(pc++), true, a); }
 
 // Op. Code: 0x86
-void CPU::STX_ZPG() { map_memory(cart.read(pc++), true, x); }
+void CPU::STX_ZPG() { map_memory(cart.read_rom(pc++), true, x); }
 
 // Op. Code: 0x88
 void CPU::DEY_IMPL() {
@@ -407,7 +396,7 @@ void CPU::TXA_IMPL() {}
 void CPU::STY_ABS() {}
 
 // Op. Code: 0x8D
-void CPU::STA_ABS() { map_memory(cart.read(pc++) | (cart.read(pc++) << 8), true, a); }
+void CPU::STA_ABS() { map_memory(cart.read_rom(pc++) | (cart.read_rom(pc++) << 8), true, a); }
 
 // Op. Code: 0x8E
 void CPU::STX_ABS() {}
@@ -417,7 +406,7 @@ void CPU::BCC_REL() {}
 
 // Op. Code: 0x91
 void CPU::STA_IND_Y() {
-    uint8_t data = cart.read(pc++); // left padded zeroes: 0x00bb
+    uint8_t data = cart.read_rom(pc++); // left padded zeroes: 0x00bb
     uint16_t zpg_addr = (map_memory(static_cast<uint16_t>(data + 1)) << 8) | map_memory(data);
     a = map_memory(zpg_addr + y);
 }
@@ -435,7 +424,10 @@ void CPU::STX_ZPG_Y() {}
 void CPU::TYA_IMPL() {}
 
 // Op. Code: 0x99
-void CPU::STA_ABS_Y() {}
+void CPU::STA_ABS_Y() {
+    uint8_t addr = map_memory(cart.read_rom(pc++) | (cart.read_rom(pc++) << 8));
+    a = addr + y;
+}
 
 // Op. Code: 0x9A
 void CPU::TXS_IMPL() { sp = x; }
@@ -445,7 +437,7 @@ void CPU::STA_ABS_X() {}
 
 // Op. Code: 0xA0
 void CPU::LDY_IMD() {
-    y = cart.read(pc++);
+    y = cart.read_rom(pc++);
     p.set(1, y == 0);
     p.set(7, static_cast<bool>( y & 0x80));
 }
@@ -455,7 +447,7 @@ void CPU::LDA_X_IND() {}
 
 // Op. Code: 0xA2}
 void CPU::LDX_IMD() {
-    x = cart.read(pc++);
+    x = cart.read_rom(pc++);
     p.set(1, x == 0);
     p.set(7, static_cast<bool>( x & 0x80));
 }
@@ -474,7 +466,7 @@ void CPU::TAY_IMPL() {}
 
 // Op. Code: 0xA9
 void CPU::LDA_IMD() {
-    a = cart.read(pc++);
+    a = cart.read_rom(pc++);
     p.set(1, a == 0);
     p.set(7, static_cast<bool>( a & 0x80));
 }
@@ -487,7 +479,7 @@ void CPU::LDY_ABS() {}
 
 // Op. Code: 0xAD
 void CPU::LDA_ABS() {
-    a = map_memory(cart.read(pc++) | (cart.read(pc++) << 8));
+    a = map_memory(cart.read_rom(pc++) | (cart.read_rom(pc++) << 8));
     p.set(1, a == 0);
     p.set(7, static_cast<bool>(a & 0x80));
 }
@@ -496,7 +488,7 @@ void CPU::LDA_ABS() {
 void CPU::LDX_ABS() {}
 
 // Op. Code: 0xB0
-void CPU::BCS_REL() { p.test(0) ? pc += cart.read(pc++) : ++pc; }
+void CPU::BCS_REL() { p.test(0) ? pc += cart.read_rom(pc++) : ++pc; }
 
 // Op. Code: 0xB1
 void CPU::LDA_IND_Y() {}
@@ -524,7 +516,7 @@ void CPU::LDY_ABS_X() {}
 
 // Op. Code: 0xBD
 void CPU::LDA_ABS_X() {
-    x = map_memory(cart.read(pc++) | (cart.read(pc++) << 8));
+    x = map_memory(cart.read_rom(pc++) | (cart.read_rom(pc++) << 8));
     p.set(1, x == 0);
     p.set(7, static_cast<bool>(x & 0x80));
 }
@@ -534,7 +526,7 @@ void CPU::LDX_ABS_Y() {}
 
 // Op. Code: 0xC0
 void CPU::CPY_IMD() {
-    uint8_t data = map_memory(cart.read(pc++));
+    uint8_t data = map_memory(cart.read_rom(pc++));
     p.set(0, y >= data);
     p.set(1, y == data);
     p.set(7, (y - data) < 0);
@@ -557,7 +549,7 @@ void CPU::INY_IMPL() {}
 
 // Op. Code: 0xC9
 void CPU::CMP_IMD() {
-    uint8_t data = map_memory(cart.read(pc++));
+    uint8_t data = map_memory(cart.read_rom(pc++));
     p.set(0, a >= data);
     p.set(1, a == data);
     p.set(7, (a - data) < 0);
@@ -580,7 +572,7 @@ void CPU::CMP_ABS() {}
 void CPU::DEC_ABS() {}
 
 // Op. Code: 0xD0
-void CPU::BNE_REL() { !p.test(1) ? pc += ext_s16(cart.read(pc++)) : ++pc; }
+void CPU::BNE_REL() { !p.test(1) ? pc += ext_s16(cart.read_rom(pc++)) : ++pc; }
 
 // Op. Code: 0xD1
 void CPU::CMP_IND_Y() {}
@@ -602,7 +594,7 @@ void CPU::CMP_ABS_X() {}
 
 // Op. Code: 0xDE
 void CPU::DEC_ABS_X() {
-    uint16_t addr = cart.read(pc++) | (cart.read(pc++) << 8);
+    uint16_t addr = cart.read_rom(pc++) | (cart.read_rom(pc++) << 8);
     uint8_t result;
     result = static_cast<uint8_t>(map_memory(addr) - 1);
     map_memory(addr, true, result);
@@ -610,7 +602,7 @@ void CPU::DEC_ABS_X() {
 
 // Op. Code: 0xE0
 void CPU::CPX_IMD() {
-    uint8_t data = cart.read(pc++);
+    uint8_t data = cart.read_rom(pc++);
     p.set(0, x >= data);
     p.set(1, x == data);
     p.set(7, (x - data) < 0);
@@ -647,7 +639,7 @@ void CPU::SBC_ABS() {}
 void CPU::INC_ABS() {}
 
 // Op. Code: 0xF0
-void CPU::BEQ_REL() { p.test(1) ? pc += cart.read(pc++) : ++pc; }
+void CPU::BEQ_REL() { p.test(1) ? pc += cart.read_rom(pc++) : ++pc; }
 
 // Op. Code: 0xF1
 void CPU::SBC_IND_Y() {}
@@ -669,7 +661,7 @@ void CPU::SBC_ABS_X() {}
 
 // Op. Code: 0xFE
 void CPU::INC_ABS_X() {
-    //    map_memory(cart.read(pc++), true, map_memory(cart.read(pc)));
+    //    map_memory(cart.read_rom(pc++), true, access_registers(cart.read_prg_rom(pc)));
 }
 
 int main(int argc, char const *argv[]) {

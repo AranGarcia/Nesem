@@ -14,7 +14,8 @@ public:
     Cartridge(std::string);
     ~Cartridge();
 
-    uint8_t read(uint16_t);
+    uint8_t read_rom(uint16_t);
+    uint8_t rw_ram(uint16_t, bool = false, uint8_t = 0);
 
     size_t getPrgROMSize();
     size_t getChrROMSize();
@@ -29,9 +30,9 @@ private:
     std::string fname;
 
     // ROM sizes in KB
-    size_t prgROMBanks;
-    size_t chrROMBanks;
-    size_t prgRAMBanks;
+    size_t prg_rom_banks;
+    size_t chr_rom_banks;
+    size_t prg_ram_banks;
 
     MIRRORING mirroringType;
     bool includesBatteryRAM;

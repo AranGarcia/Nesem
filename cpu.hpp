@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "apu.h"
 #include "cartridge.hpp"
 #include "ppu.h"
 
@@ -26,6 +27,7 @@ private:
     // Game Pak link
     Cartridge cart;
     PPU ppu;
+    APU apu;
 
     // Registers
     uint8_t a;   // Accumulator
@@ -50,7 +52,7 @@ private:
 
     uint16_t stack_pop();
 
-    void stack_push(uint16_t );
+    void stack_push(uint16_t);
 
     // Instructions}
     std::array<F, 256> instructions;

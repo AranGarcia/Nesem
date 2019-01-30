@@ -1,6 +1,5 @@
 #include <cstdint>
 #include <cstring>
-#include <exception>
 #include <fstream>
 #include <iostream>
 
@@ -41,8 +40,8 @@ bool Cartridge::parse(string fname) {
     }
 
     // ROM Sizes (amount of 16KB Banks)
-    prgROMBanks = (size_t) header[4];
-    chrROMBanks = (size_t) header[5];
+    prg_rom_banks = (size_t) header[4];
+    chr_rom_banks = (size_t) header[5];
 
     // Screen mirroring type (bit 3 overrides bit 1)
     if ((header[6] & 8) == 8) {
@@ -55,17 +54,17 @@ bool Cartridge::parse(string fname) {
     // 512 byte trainer
     includesTrainer = (header[6] & 4) == 4;
     // Mapper number
-    mapperNumber = (header[7] & 0xF0) | (header[6] >> 4);
+    mapperNumber = static_cast<unsigned short>((header[7] & 0xF0) | (header[6] >> 4));
     if (mapperNumber != 0) {
         throw invalid_argument("mapper not yet implemented.");
     }
 
     // Amount of 8KB RAM Banks, for backwards compatibility
-    prgRAMBanks = header[8];
-    if (!prgRAMBanks) {
+    prg_ram_banks = static_cast<size_t>(header[8]);
+    if (!prg_ram_banks) {
         // 1 bank should always be assumed, even though
         // the value is 0.
-        prgRAMBanks = 1;
+        prg_ram_banks = 1;
     }
 
     // 0x07 - 0x0F should be all zeroes (used in the future?)
@@ -78,16 +77,16 @@ bool Cartridge::parse(string fname) {
     }
 
     // PRG-ROM
-    uint8_t *prgROM = new uint8_t[PRG_ROM_BANK_SIZE * prgROMBanks];
-    gameFile.read((char *) prgROM, PRG_ROM_BANK_SIZE * prgROMBanks);
+    uint8_t *prgROM = new uint8_t[PRG_ROM_BANK_SIZE * prg_rom_banks];
+    gameFile.read((char *) prgROM, PRG_ROM_BANK_SIZE * prg_rom_banks);
     // CHR-ROM
-    uint8_t *chrROM = new uint8_t[CHR_ROM_BANK_SIZE * chrROMBanks];
-    gameFile.read((char *) chrROM, CHR_ROM_BANK_SIZE * chrROMBanks);
+    uint8_t *chrROM = new uint8_t[CHR_ROM_BANK_SIZE * chr_rom_banks];
+    gameFile.read((char *) chrROM, CHR_ROM_BANK_SIZE * chr_rom_banks);
     // PRG-RAM
-    uint8_t *prgRAM = new uint8_t[PRG_RAM_BANK_SIZE * prgRAMBanks];
+    uint8_t *prgRAM = new uint8_t[PRG_RAM_BANK_SIZE * prg_ram_banks];
 
-    mapper = new Mapper(prgROM, chrROM, prgRAM, prgROMBanks, chrROMBanks,
-                        prgRAMBanks);
+    mapper = new Mapper(prgROM, chrROM, prgRAM, prg_rom_banks, chr_rom_banks,
+                        prg_ram_banks);
 
     return true;
 }
@@ -99,16 +98,24 @@ Cartridge::~Cartridge() {
 /*
    Reads indirectly from the cartridge through the mapper
  */
-uint8_t Cartridge::read(uint16_t addr) {
-    return mapper->read(addr);
+uint8_t Cartridge::read_rom(uint16_t addr) {
+    return mapper->read_prg_rom(addr);
 }
 
+uint8_t Cartridge::rw_ram(uint16_t addr, bool write, uint8_t data) {
+    if (write) { mapper->w_prg_ram(addr, data); }
+    else { return mapper->r_prg_ram(addr); }
+
+    return 0;
+}
+
+
 size_t Cartridge::getPrgROMSize() {
-    return prgROMBanks;
+    return prg_rom_banks;
 }
 
 size_t Cartridge::getChrROMSize() {
-    return chrROMBanks;
+    return chr_rom_banks;
 }
 
 MIRRORING Cartridge::getMirroringType() {
@@ -142,8 +149,8 @@ ostream &operator<<(ostream &out, const Cartridge &cart) {
     }
 
     out << "Rom: '" << cart.fname << "'" << endl
-        << "\tPRG-ROM: " << cart.prgROMBanks << " banks of 16KB" << endl
-        << "\tCHR-ROM: " << cart.chrROMBanks << " banks of 8KB" << endl
+        << "\tPRG-ROM: " << cart.prg_rom_banks << " banks of 16KB" << endl
+        << "\tCHR-ROM: " << cart.chr_rom_banks << " banks of 8KB" << endl
         << "\tMirroring: " << mirroring << endl
         << "\tBattery backed RAM: " << (cart.includesBatteryRAM ? "Yes" : "No") << endl
         << "\t512 byte trainer: " << (cart.includesTrainer ? "Yes" : "No") << endl

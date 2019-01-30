@@ -1,6 +1,7 @@
 #ifndef MAPPER_H
 #define MAPPER_H
 
+#include <iostream>
 #include <cstdlib>
 
 /**************************************
@@ -17,17 +18,23 @@ public:
 
     ~Mapper();
 
-    uint8_t read(uint16_t) const;
+    uint8_t read_prg_rom(uint16_t) const;
+
+    uint8_t read_chr_rom(uint16_t) const;
+
+    void w_prg_ram(uint16_t, uint8_t);
+
+    uint8_t r_prg_ram(uint16_t);
 
 protected:
-    uint8_t *prgROM;
-    uint8_t *chrROM;
-    uint8_t *prgRAM;
+    uint8_t *prg_rom;
+    uint8_t *chr_rom;
+    uint8_t *prg_ram;
 
     // Number of banks in the cartridge
-    size_t prgROMBanks;        // Bank size: 16 KB
-    size_t chrROMBanks;        // Bank size: 8 KB
-    size_t prgRAMBanks;        // Bank size: 8 KB
+    size_t prg_rom_banks;        // Bank size: 16 KB
+    size_t chr_rom_banks;        // Bank size: 8 KB
+    size_t prg_ram_banks;        // Bank size: 8 KB
 };
 
 #endif
