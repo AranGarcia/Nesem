@@ -2,7 +2,7 @@
 // Created by docto on 28/01/2019.
 //
 
-#include "apu.h"
+#include "apu.hpp"
 
 /**
  * Links the APU's registers to the CPU's memory map.

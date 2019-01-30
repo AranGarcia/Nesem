@@ -8,9 +8,9 @@
 #include <string>
 #include <vector>
 
-#include "apu.h"
+#include "apu.hpp"
 #include "cartridge.hpp"
-#include "ppu.h"
+#include "ppu.hpp"
 
 /**
  * Implementation of a 6502 microprocessor

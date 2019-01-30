@@ -1,2 +1,5 @@
 project(Nesem)
-add_executable(nesem cpu.cpp cartridge.cpp mapper.cpp ppu.cpp apu.cpp apu.h)
+
+cmake_minimum_required (VERSION 2.6)
+include_directories(include)
+add_subdirectory(src)

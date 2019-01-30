@@ -1,7 +1,7 @@
 //
 
 #include <iostream>
-#include "ppu.h"
+#include "ppu.hpp"
 
 using namespace std;
 
